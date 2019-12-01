@@ -1,0 +1,60 @@
+
+<template>
+  <div class="content">
+    <component
+      :is="item.asyncComponent"
+      v-for="(item, index) in components"
+      :key="index"
+      v-bind="item.data"
+    />
+  </div>
+</template>
+
+<script>
+
+import { getAsyncComponents } from '@/utils/async-components';
+
+export default {
+  scrollToTop: true,
+
+  data () {
+    return {
+      title: 'title of page',
+      components: []
+    };
+  },
+
+  head () {
+    return {
+      title: this.title
+    };
+  },
+
+  asyncData ({ store, app, route, error }) {
+    const path = (route.fullPath.split('?')[0] + '/')
+      // remove lang prefix
+      .replace(/^\//, '')
+      .replace(/^\w{2}\//, '')
+      .replace(/\/$/, '') || 'index';
+
+    return import(/* webpackMode: "lazy" */`@/virtual-locales/${app.i18n.locale}/${path}.json`).then(data => {
+      if ('routeParams' in data) {
+        // set other locale slugs for languageSwitch
+        store.dispatch('i18n/setRouteParams', data.routeParams);
+      }
+      return {
+        title: data.title,
+        components: data.components
+      };
+    }).catch(() => {
+      error({ statusCode: 404, message: 'local json file not found' });
+    });
+  },
+
+  created () {
+    this.components = getAsyncComponents(this.components);
+  }
+
+};
+
+</script>
