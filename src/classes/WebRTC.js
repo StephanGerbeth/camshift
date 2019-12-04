@@ -3,13 +3,35 @@ import { fromEvent } from 'rxjs';
 import { take, map, find } from 'rxjs/operators';
 
 export default class WebRTC {
-  constructor(stream, key = null) {
+  constructor(stream, key = null, config) {
+    console.log(config);
     this.key = key;
     this.peer = new SimplePeer({
       initiator: !key,
       trickle: false,
-      stream: stream
+      // stream: stream,
+      config: {
+        iceServers: [
+          {
+            urls: [
+              'stun:eu-turn5.xirsys.com'
+            ]
+          }, {
+            username: 'JwbjGz4loHRDEy7NOWAxuoG6OR_U5cO3LS4IshymjZIm5d1d9asAx7BVMevDBLOgAAAAAF3lGnlzZ2VyYmV0aA==',
+            credential: 'fb820e16-150c-11ea-ba48-8e4d62b186e1',
+            urls: [
+              'turn:eu-turn5.xirsys.com:80?transport=udp',
+              'turn:eu-turn5.xirsys.com:3478?transport=udp',
+              'turn:eu-turn5.xirsys.com:80?transport=tcp',
+              'turn:eu-turn5.xirsys.com:3478?transport=tcp',
+              'turns:eu-turn5.xirsys.com:443?transport=tcp',
+              'turns:eu-turn5.xirsys.com:5349?transport=tcp'
+            ]
+          }
+        ]
+      }
     });
+    // this.peer.addStream(stream);
     this.database = loadDatabase();
 
     this.peer.on('error', err => console.log('error', err));
@@ -23,7 +45,7 @@ export default class WebRTC {
     const database = await this.database;
     const data = await this.listenTo('signal');
     // add answer to firebase
-    const entry = await commitSignal(database, this.key, data);
+    const entry = await publishSignal(database, this.key, data);
 
     if (!this.key) {
       // contact client
@@ -49,7 +71,12 @@ export default class WebRTC {
     database.destroy();
   }
 
-  onStreamChange () {
+  addStream (stream) {
+    console.log('OLO');
+    this.peer.addStream(stream);
+  }
+
+  onStream () {
     return this.listenTo('stream');
   }
 
@@ -84,13 +111,16 @@ function loadDatabase () {
 
 async function connectPeer (peer, entry, type) {
   const value = await waitForSignal(entry, type);
+  console.log(value);
   peer.signal(value);
 }
 
-function commitSignal (database, key, data) {
+function publishSignal (database, key, data) {
   if (!key) {
+    data.type = 'offer';
     return database.add(data);
   } else {
+    data.type = 'answer';
     return database.update(key, data);
   }
 }

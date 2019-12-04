@@ -1,24 +1,29 @@
 <template>
   <div>
-    Test
-    <a
+    <div v-if="!connected">
+      waiting for client...
+    </div>
+    <div v-if="loading">
+      loading stream ...
+    </div>
+
+    <qr-code
       v-if="url"
-      :href="url"
-      target="_blank"
-    >
-      <img :src="qrcode">
-    </a>
+      :url="url"
+    />
+
     <label class="status">
       Connected <span :class="{ active: connected }" />
     </label>
     <button @click="generate">
       HangUp!
     </button>
-    <cam @loadedmetadata.native="onCamLoaded" />
+    <cam @load="onCamLoaded" />
     <video
       :srcObject.prop="remoteStream"
       autoplay
       playsinline
+      @playing="onPlaying"
     />
   </div>
 </template>
@@ -26,16 +31,19 @@
 <script>
 import WebRTC from '@/classes/WebRTC';
 import Cam from '@/components/atoms/Cam';
+import QrCode from '@/components/atoms/QrCode';
 
 export default {
   components: {
-    Cam
+    Cam,
+    QrCode
   },
 
   data () {
     return {
       url: null,
       connected: false,
+      loading: false,
       remoteStream: null
     };
   },
@@ -50,7 +58,7 @@ export default {
   },
 
   mounted () {
-    // this.prepare();
+    this.prepare();
   },
 
   destroyed () {
@@ -59,21 +67,23 @@ export default {
 
   methods: {
     async prepare () {
-      this.webrtc = new WebRTC(this.stream, this.key);
-      this.webrtc.onStreamChange()
+      this.webrtc = new WebRTC(this.stream, this.key, this.webrtcConfig);
+      this.webrtc.onStream()
         .then((stream) => {
           this.remoteStream = stream;
           return;
         }).catch((e) => {
           throw e;
         });
-
       await Promise.all([
         this.setup(),
         this.webrtc.connect()
       ]);
       this.connected = true;
+      this.loading = true;
+
       this.webrtc.send('hello');
+
       await this.webrtc.onClose();
       this.connected = false;
       this.prepare();
@@ -89,13 +99,36 @@ export default {
     generate () {
       this.webrtc.destroy();
       this.webrtc = null;
+      this.url = null;
       this.remoteStream = null;
       this.prepare();
     },
 
-    onCamLoaded (e) {
-      this.stream = e.target.srcObject;
-      this.prepare();
+    onCamLoaded (stream) {
+      this.stream = stream;
+      this.webrtc.addStream(stream);
+
+      // this.$axios({
+      //   method: 'put',
+      //   url: 'https://global.xirsys.net/_turn/MyFirstApp',
+      //   headers: {
+      //     'Authorization': `Basic ${btoa('sgerbeth:973d2210-14d5-11ea-8a7c-0242ac110003')}`
+      //   },
+      //   data: {
+      //     format: 'urls'
+      //   }
+      // }).then((e) => {
+      //   this.webrtcConfig = e.data.v;
+
+      //   return;
+      // }).catch((e) => {
+      //   throw e;
+      // });
+      // this.prepare();
+    },
+
+    onPlaying () {
+      this.loading = false;
     }
   }
 };

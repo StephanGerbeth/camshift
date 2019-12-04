@@ -1,11 +1,17 @@
 <template>
-  <video
-    autoplay
-    playsinline
-    :width="width"
-    :height="height"
-    @loadedmetadata="onLoad"
-  />
+  <div>
+    <video
+      autoplay
+      playsinline
+      :width="width"
+      :height="height"
+      :srcObject.prop="stream"
+      @loadedmetadata="onLoad"
+    />
+    <button @click="onClick">
+      Toggle
+    </button>
+  </div>
 </template>
 
 <script>
@@ -33,6 +39,8 @@ export default {
 
   data () {
     return {
+      videoDevices: [],
+      stream: null,
       width: 0,
       height: 0
     };
@@ -49,25 +57,52 @@ export default {
     }
   },
 
-  mounted () {
-    global.navigator.mediaDevices
-      .getUserMedia(this.constraints)
-      .then(stream => {
-        this.$el.srcObject = stream;
-        return navigator.mediaDevices.enumerateDevices();
-      })
-      .catch(error => {
-        console.error(error);
-      });
+  async mounted () {
+    this.videoDevices = await getDevices();
+    this.stream = await this.getStream();
+    this.$emit('load', this.stream);
   },
 
   methods: {
     onLoad (e) {
       this.width = e.target.videoWidth;
       this.height = e.target.videoHeight;
+      console.log('AJA');
+    },
+
+    onClick () {
+      console.log('HIHI');
+      this.toggleVideoDevice();
+    },
+
+    getStream () {
+      return getUserMedia(getConstraints(this.videoDevices[0]));
+    },
+
+    async toggleVideoDevice () {
+      this.videoDevices.push(this.videoDevices.shift());
+      this.stream = await this.getStream();
     }
   }
 };
+
+async function getDevices () {
+  const devices = await global.navigator.mediaDevices.enumerateDevices();
+  return devices.filter((device) => device.kind === 'videoinput');
+}
+
+function getConstraints (videoDevice) {
+  return {
+    video: {
+      deviceId: videoDevice.deviceId
+    },
+    audio: false
+  };
+}
+
+async function getUserMedia (constraints) {
+  return await global.navigator.mediaDevices.getUserMedia(constraints);
+}
 </script>
 
 <style lang="postcss" scoped>
