@@ -14,9 +14,7 @@ export default class WebRTC {
     });
     this.database = loadDatabase();
 
-    this.peer.on('error', err => console.log('error', err));
-
-    this.getObserver('data').subscribe((data) => {
+    this.getDataObserver().subscribe((data) => {
       console.log('data: ' + data);
     });
   }
@@ -42,7 +40,11 @@ export default class WebRTC {
       // contact master
       connectPeer(this.peer, entry, 'offer');
     }
-    return this.listenTo('connect');
+    return Promise.all([
+      this.listenTo('stream'), this.listenTo('connect')
+    ]).then(([
+      stream
+    ]) => stream);
   }
 
   async destroy () {
@@ -59,6 +61,10 @@ export default class WebRTC {
     return this.listenTo('close');
   }
 
+  onError () {
+    return this.listenTo('error');
+  }
+
   send (data) {
     this.peer.send(data);
   }
@@ -71,8 +77,8 @@ export default class WebRTC {
       .toPromise();
   }
 
-  getObserver (type) {
-    return fromEvent(this.peer, type);
+  getDataObserver () {
+    return fromEvent(this.peer, 'data');
   }
 }
 
@@ -86,7 +92,6 @@ function loadDatabase () {
 
 async function connectPeer (peer, entry, type) {
   const value = await waitForSignal(entry, type);
-  console.log(value);
   peer.signal(value);
 }
 

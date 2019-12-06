@@ -15,10 +15,10 @@
     <label class="status">
       Connected <span :class="{ active: connected }" />
     </label>
-    <button @click="renew">
+    <button @click="close">
       HangUp!
     </button>
-    <cam @load="onCamLoaded" />
+    <cam @load="onCamLoad" />
     <video
       :srcObject.prop="remoteStream"
       autoplay
@@ -30,6 +30,7 @@
 
 <script>
 import WebRTC from '@/classes/WebRTC';
+import { getIceServers } from '@/utils/webrtc';
 import Cam from '@/components/atoms/Cam';
 import QrCode from '@/components/atoms/QrCode';
 
@@ -42,9 +43,10 @@ export default {
   data () {
     return {
       url: null,
+      webrtc: null,
+      remoteStream: null,
       connected: false,
-      loading: false,
-      remoteStream: null
+      loading: false
     };
   },
 
@@ -59,65 +61,44 @@ export default {
   },
 
   methods: {
-    async prepare () {
+    async open () {
       this.webrtc = new WebRTC(this.stream, this.key, this.config);
-      this.webrtc.onStream()
-        .then((stream) => {
-          this.remoteStream = stream;
-          return;
-        }).catch((e) => {
-          throw e;
-        });
-      await Promise.all([
-        this.setup(),
+      this.remoteStream = await this.setup();
+      this.webrtc.send('hello');
+
+      await Promise.race([
+        this.webrtc.onClose(), this.webrtc.onError()
+      ]);
+      Object.assign(this.$data, this.$options.data.call(this));
+      this.open();
+    },
+
+    async setup () {
+      const [
+        , stream
+      ] = await Promise.all([
+        this.webrtc.setup()
+          .then((key) => {
+            if (!this.webrtc.key) {
+              this.url = `${global.location.origin}/?key=${key}`;
+            }
+            return key;
+          }),
         this.webrtc.connect()
       ]);
       this.connected = true;
       this.loading = true;
-
-      this.webrtc.send('hello');
-
-      await this.webrtc.onClose();
-      this.connected = false;
-      this.prepare();
+      return stream;
     },
 
-    async setup () {
-      const entry = await this.webrtc.setup();
-      if (!this.webrtc.key) {
-        this.url = `${global.location.origin}/?key=${entry}`;
-      }
-    },
-
-    renew () {
-      this.webrtc.destroy();
-      this.webrtc = null;
-      this.url = null;
-      this.remoteStream = null;
-      this.prepare();
-    },
-
-    onCamLoaded (stream) {
+    async onCamLoad (stream) {
       this.stream = stream;
-      this.config = getWebRTCConfig();
+      this.config = getIceServers();
+      this.open();
+    },
 
-      // this.$axios({
-      //   method: 'put',
-      //   url: 'https://global.xirsys.net/_turn/MyFirstApp',
-      //   headers: {
-      //     'Authorization': `Basic ${btoa('sgerbeth:973d2210-14d5-11ea-8a7c-0242ac110003')}`
-      //   },
-      //   data: {
-      //     format: 'urls'
-      //   }
-      // }).then((e) => {
-      //   this.webrtcConfig = e.data.v;
-
-      //   return;
-      // }).catch((e) => {
-      //   throw e;
-      // });
-      this.prepare();
+    close () {
+      this.webrtc.destroy();
     },
 
     onPlaying () {
@@ -125,29 +106,6 @@ export default {
     }
   }
 };
-
-function getWebRTCConfig () {
-  return {
-    iceServers: [
-      {
-        urls: [
-          'stun:eu-turn5.xirsys.com'
-        ]
-      }, {
-        username: 'JwbjGz4loHRDEy7NOWAxuoG6OR_U5cO3LS4IshymjZIm5d1d9asAx7BVMevDBLOgAAAAAF3lGnlzZ2VyYmV0aA==',
-        credential: 'fb820e16-150c-11ea-ba48-8e4d62b186e1',
-        urls: [
-          'turn:eu-turn5.xirsys.com:80?transport=udp',
-          'turn:eu-turn5.xirsys.com:3478?transport=udp',
-          'turn:eu-turn5.xirsys.com:80?transport=tcp',
-          'turn:eu-turn5.xirsys.com:3478?transport=tcp',
-          'turns:eu-turn5.xirsys.com:443?transport=tcp',
-          'turns:eu-turn5.xirsys.com:5349?transport=tcp'
-        ]
-      }
-    ]
-  };
-}
 </script>
 
 <style lang="postcss" scoped>
