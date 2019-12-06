@@ -15,7 +15,7 @@
     <label class="status">
       Connected <span :class="{ active: connected }" />
     </label>
-    <button @click="generate">
+    <button @click="renew">
       HangUp!
     </button>
     <cam @load="onCamLoaded" />
@@ -51,14 +51,7 @@ export default {
   computed: {
     key: function () {
       return this.$router.currentRoute.query.key;
-    },
-    qrcode: function () {
-      return `https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=${this.url}&choe=UTF-8`;
     }
-  },
-
-  mounted () {
-    this.prepare();
   },
 
   destroyed () {
@@ -67,7 +60,7 @@ export default {
 
   methods: {
     async prepare () {
-      this.webrtc = new WebRTC(this.stream, this.key, this.webrtcConfig);
+      this.webrtc = new WebRTC(this.stream, this.key, this.config);
       this.webrtc.onStream()
         .then((stream) => {
           this.remoteStream = stream;
@@ -96,7 +89,7 @@ export default {
       }
     },
 
-    generate () {
+    renew () {
       this.webrtc.destroy();
       this.webrtc = null;
       this.url = null;
@@ -106,7 +99,7 @@ export default {
 
     onCamLoaded (stream) {
       this.stream = stream;
-      this.webrtc.addStream(stream);
+      this.config = getWebRTCConfig();
 
       // this.$axios({
       //   method: 'put',
@@ -124,7 +117,7 @@ export default {
       // }).catch((e) => {
       //   throw e;
       // });
-      // this.prepare();
+      this.prepare();
     },
 
     onPlaying () {
@@ -132,6 +125,29 @@ export default {
     }
   }
 };
+
+function getWebRTCConfig () {
+  return {
+    iceServers: [
+      {
+        urls: [
+          'stun:eu-turn5.xirsys.com'
+        ]
+      }, {
+        username: 'JwbjGz4loHRDEy7NOWAxuoG6OR_U5cO3LS4IshymjZIm5d1d9asAx7BVMevDBLOgAAAAAF3lGnlzZ2VyYmV0aA==',
+        credential: 'fb820e16-150c-11ea-ba48-8e4d62b186e1',
+        urls: [
+          'turn:eu-turn5.xirsys.com:80?transport=udp',
+          'turn:eu-turn5.xirsys.com:3478?transport=udp',
+          'turn:eu-turn5.xirsys.com:80?transport=tcp',
+          'turn:eu-turn5.xirsys.com:3478?transport=tcp',
+          'turns:eu-turn5.xirsys.com:443?transport=tcp',
+          'turns:eu-turn5.xirsys.com:5349?transport=tcp'
+        ]
+      }
+    ]
+  };
+}
 </script>
 
 <style lang="postcss" scoped>

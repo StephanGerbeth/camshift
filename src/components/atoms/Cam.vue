@@ -81,7 +81,11 @@ export default {
 
     async toggleVideoDevice () {
       this.videoDevices.push(this.videoDevices.shift());
-      this.stream = await this.getStream();
+      // this.stream = await this.getStream();
+      this.stream.getVideoTracks()[0].applyConstraints({
+        width: 160,
+        height: 120,
+      });
     }
   }
 };
