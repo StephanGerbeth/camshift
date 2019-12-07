@@ -3,11 +3,10 @@ import { fromEvent } from 'rxjs';
 import { take, map, find } from 'rxjs/operators';
 
 export default class WebRTC {
-  constructor(stream, key = null, config) {
-    console.log(config);
-    this.key = key;
+  constructor(stream, initiator = false, config) {
+    console.log('--- NEW WEBRTC CLIENT ---');
     this.peer = new SimplePeer({
-      initiator: !key,
+      initiator: initiator,
       trickle: false,
       stream: stream,
       config: config
@@ -15,44 +14,49 @@ export default class WebRTC {
 
     this.database = loadDatabase();
 
-    this.signal = this.listenTo('signal');
     this.connect = onConnect(this.listenTo('stream'), this.listenTo('connect'));
     this.disconnect = onDisconnect(this.listenTo('close'), this.listenTo('error'));
+    this.signal = this.listenTo('signal');
 
     this.getDataObserver().subscribe((data) => {
       console.log('data: ' + data);
     });
   }
 
-  async publishSignal () {
+  async publishSignal (key) {
+    console.log('-> webrtc: publish signal', key);
     const database = await this.database;
     const data = await this.signal;
 
-    if (!this.key) {
+    if (!key) {
       data.type = 'offer';
       return database.add(data);
     } else {
       data.type = 'answer';
-      return database.update(this.key, data);
+      return database.update(key, data);
     }
   }
 
   async receiveSignal (key) {
+    console.log('-> webrtc: receive signal', key);
     const database = await this.database;
     return database.get(key);
   }
 
   async destroy () {
+    console.log('-> webrtc: destroy');
     this.peer.destroy();
     const database = await this.database;
     database.destroy();
   }
 
   connectSlave (entry) {
+    console.log('-> webrtc: connect slave');
     connectPeer(this.peer, entry, 'answer');
   }
 
   connectMaster (entry) {
+    console.log('-> webrtc: connect master');
     connectPeer(this.peer, entry, 'offer');
   }
 
@@ -85,21 +89,18 @@ async function onDisconnect (...listener) {
 }
 
 async function connectPeer (peer, entry, type) {
-  const value = await waitForSignal(entry, type);
+  console.log('-> webrtc: connect peer');
+  const value = await fromEvent(entry, 'value')
+    .pipe(
+      map((snapshot) => snapshot.val()),
+      find((val) => val.type === type),
+      take(1)
+    )
+    .toPromise();
   peer.signal(value);
 }
 
 async function loadDatabase () {
   const { default: Database } = await import('@/service/firebase/database');
   return new Database('handshake');
-}
-
-function waitForSignal (entry, value) {
-  return fromEvent(entry, 'value')
-    .pipe(
-      map((snapshot) => snapshot.val()),
-      find((val) => val.type === value),
-      take(1)
-    )
-    .toPromise();
 }

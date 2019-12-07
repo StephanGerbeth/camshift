@@ -15,7 +15,10 @@
     <label class="status">
       Connected <span :class="{ active: connected }" />
     </label>
-    <button @click="close">
+    <button
+      v-if="connected"
+      @click="close"
+    >
       HangUp!
     </button>
     <cam @load="onCamLoad" />
@@ -62,9 +65,9 @@ export default {
 
   methods: {
     async connect () {
-      this.webrtc = await this.setup(this.stream, this.key, this.config);
+      this.webrtc = await this.setup();
       this.remoteStream = await this.webrtc.connect;
-
+      console.log('-> vue: on connect');
       this.connected = true;
       this.loading = true;
       this.webrtc.send('hello');
@@ -74,8 +77,8 @@ export default {
       this.connect();
     },
 
-    async setup (stream, key, config) {
-      const webrtc = new WebRTC(stream, key, config);
+    async setup () {
+      const webrtc = new WebRTC(this.stream, !this.key, this.config);
       if (this.key) {
         connectMaster(webrtc, this.key);
       } else {
@@ -101,14 +104,14 @@ export default {
 };
 
 async function connectMaster (webrtc, key) {
-  const publishOwnSignal = webrtc.publishSignal();
+  const publishOwnSignal = webrtc.publishSignal(key);
   const entry = await webrtc.receiveSignal(key);
   webrtc.connectMaster(entry);
   publishOwnSignal;
 }
 
-async function connectSlave (webrtc) {
-  const entry = await webrtc.publishSignal();
+async function connectSlave (webrtc, key = null) {
+  const entry = await webrtc.publishSignal(key);
   webrtc.connectSlave(entry);
   return `${global.location.origin}/?key=${entry.key}`;
 }

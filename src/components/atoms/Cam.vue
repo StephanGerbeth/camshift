@@ -60,14 +60,14 @@ export default {
   async mounted () {
     this.videoDevices = await getDevices();
     this.stream = await this.getStream();
-    this.$emit('load', this.stream);
   },
 
   methods: {
     onLoad (e) {
       this.width = e.target.videoWidth;
       this.height = e.target.videoHeight;
-      console.log('AJA');
+      console.log('-> cam: loaded');
+      this.$emit('load', this.stream);
     },
 
     onClick () {
