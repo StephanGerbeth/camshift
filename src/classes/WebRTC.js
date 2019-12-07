@@ -12,44 +12,34 @@ export default class WebRTC {
       stream: stream,
       config: config
     });
+
     this.database = loadDatabase();
+
+    this.signal = this.listenTo('signal');
+    this.connect = onConnect(this.listenTo('stream'), this.listenTo('connect'));
+    this.disconnect = onDisconnect(this.listenTo('close'), this.listenTo('error'));
 
     this.getDataObserver().subscribe((data) => {
       console.log('data: ' + data);
     });
   }
 
-  async setup () {
+  async publishSignal () {
     const database = await this.database;
-    const data = await this.listenTo('signal');
-    // add answer to firebase
-    const entry = await publishSignal(database, this.key, data);
+    const data = await this.signal;
 
     if (!this.key) {
-      // contact client
-      connectPeer(this.peer, entry, 'answer');
-      return entry.key;
+      data.type = 'offer';
+      return database.add(data);
+    } else {
+      data.type = 'answer';
+      return database.update(this.key, data);
     }
   }
 
-  async connect () {
-    if (this.key) {
-      // get offer from firebase
-      const database = await this.database;
-      const entry = database.get(this.key);
-      // contact master
-      connectPeer(this.peer, entry, 'offer');
-    }
-    return await this.stream();
-  }
-
-  async stream () {
-    const [
-      stream
-    ] = await Promise.all([
-      this.listenTo('stream'), this.listenTo('connect')
-    ]);
-    return stream;
+  async receiveSignal (key) {
+    const database = await this.database;
+    return database.get(key);
   }
 
   async destroy () {
@@ -58,16 +48,12 @@ export default class WebRTC {
     database.destroy();
   }
 
-  onStream () {
-    return this.listenTo('stream');
+  connectSlave (entry) {
+    connectPeer(this.peer, entry, 'answer');
   }
 
-  onClose () {
-    return this.listenTo('close');
-  }
-
-  onError () {
-    return this.listenTo('error');
+  connectMaster (entry) {
+    connectPeer(this.peer, entry, 'offer');
   }
 
   send (data) {
@@ -87,12 +73,15 @@ export default class WebRTC {
   }
 }
 
-function loadDatabase () {
-  return import('@/service/firebase/database')
-    .then(({ default: database }) => database)
-    .then((Database) => {
-      return new Database('handshake');
-    });
+async function onConnect (...listener) {
+  const [
+    stream
+  ] = await Promise.all(listener);
+  return stream;
+}
+
+async function onDisconnect (...listener) {
+  return Promise.race(listener);
 }
 
 async function connectPeer (peer, entry, type) {
@@ -100,14 +89,9 @@ async function connectPeer (peer, entry, type) {
   peer.signal(value);
 }
 
-function publishSignal (database, key, data) {
-  if (!key) {
-    data.type = 'offer';
-    return database.add(data);
-  } else {
-    data.type = 'answer';
-    return database.update(key, data);
-  }
+async function loadDatabase () {
+  const { default: Database } = await import('@/service/firebase/database');
+  return new Database('handshake');
 }
 
 function waitForSignal (entry, value) {

@@ -61,36 +61,33 @@ export default {
   },
 
   methods: {
-    async open () {
-      this.webrtc = new WebRTC(this.stream, this.key, this.config);
-      this.remoteStream = await this.setup();
-      this.webrtc.send('hello');
-
-      await Promise.race([
-        this.webrtc.onClose(), this.webrtc.onError()
-      ]);
-      Object.assign(this.$data, this.$options.data.call(this));
-      this.open();
-    },
-
-    async setup () {
-      const waitSetup = this.webrtc.setup();
-      const waitConnect = this.webrtc.connect();
-      const key = await waitSetup;
-      if (key) {
-        this.url = `${global.location.origin}/?key=${key}`;
-      }
-      const stream = await waitConnect;
+    async connect () {
+      this.webrtc = await this.setup(this.stream, this.key, this.config);
+      this.remoteStream = await this.webrtc.connect;
 
       this.connected = true;
       this.loading = true;
-      return stream;
+      this.webrtc.send('hello');
+
+      await this.webrtc.disconnect;
+      Object.assign(this.$data, this.$options.data.call(this));
+      this.connect();
+    },
+
+    async setup (stream, key, config) {
+      const webrtc = new WebRTC(stream, key, config);
+      if (this.key) {
+        connectMaster(webrtc, this.key);
+      } else {
+        this.url = await connectSlave(webrtc);
+      }
+      return webrtc;
     },
 
     async onCamLoad (stream) {
       this.stream = stream;
       this.config = getIceServers();
-      this.open();
+      this.connect();
     },
 
     close () {
@@ -102,6 +99,19 @@ export default {
     }
   }
 };
+
+async function connectMaster (webrtc, key) {
+  const publishOwnSignal = webrtc.publishSignal();
+  const entry = await webrtc.receiveSignal(key);
+  webrtc.connectMaster(entry);
+  publishOwnSignal;
+}
+
+async function connectSlave (webrtc) {
+  const entry = await webrtc.publishSignal();
+  webrtc.connectSlave(entry);
+  return `${global.location.origin}/?key=${entry.key}`;
+}
 </script>
 
 <style lang="postcss" scoped>
