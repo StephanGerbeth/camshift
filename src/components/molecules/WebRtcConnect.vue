@@ -74,18 +74,14 @@ export default {
     },
 
     async setup () {
-      const [
-        , stream
-      ] = await Promise.all([
-        this.webrtc.setup()
-          .then((key) => {
-            if (!this.webrtc.key) {
-              this.url = `${global.location.origin}/?key=${key}`;
-            }
-            return key;
-          }),
-        this.webrtc.connect()
-      ]);
+      const waitSetup = this.webrtc.setup();
+      const waitConnect = this.webrtc.connect();
+      const key = await waitSetup;
+      if (key) {
+        this.url = `${global.location.origin}/?key=${key}`;
+      }
+      const stream = await waitConnect;
+
       this.connected = true;
       this.loading = true;
       return stream;

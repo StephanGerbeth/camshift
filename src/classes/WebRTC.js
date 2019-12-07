@@ -40,11 +40,16 @@ export default class WebRTC {
       // contact master
       connectPeer(this.peer, entry, 'offer');
     }
-    return Promise.all([
-      this.listenTo('stream'), this.listenTo('connect')
-    ]).then(([
+    return await this.stream();
+  }
+
+  async stream () {
+    const [
       stream
-    ]) => stream);
+    ] = await Promise.all([
+      this.listenTo('stream'), this.listenTo('connect')
+    ]);
+    return stream;
   }
 
   async destroy () {
