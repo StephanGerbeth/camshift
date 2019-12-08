@@ -21,6 +21,9 @@ export default class WebRTC {
     this.getDataObserver().subscribe((data) => {
       console.log('data: ' + data);
     });
+    this.getStreamObserver().subscribe((data) => {
+      console.log('stream: ' + data);
+    });
   }
 
   async publishSignal (key) {
@@ -60,6 +63,37 @@ export default class WebRTC {
     connectPeer(this.peer, entry, 'offer');
   }
 
+  changeTracks (tracks) {
+    console.log('-> webrtc: change tracks', tracks);
+    this.peer._pc.getSenders().forEach((sender) => {
+      tracks.forEach((track) => {
+        if (track.kind === sender.track.kind) {
+          sender.replaceTrack(track);
+        }
+      });
+    });
+  }
+
+  addAudioTrack (stream) {
+    this.peer._pc.getSenders().forEach((sender) => {
+      stream.getAudioTracks().forEach((track) => {
+        if (!sender.track) {
+          sender.replaceTrack(track);
+          console.log('ENABLED', sender);
+        }
+      });
+    });
+  }
+
+  removeAudioTrack () {
+    this.peer._pc.getSenders().forEach((sender) => {
+      if ('audio' === sender.track.kind) {
+        sender.replaceTrack(null);
+        console.log('DISABLED', sender);
+      }
+    });
+  }
+
   send (data) {
     this.peer.send(data);
   }
@@ -74,6 +108,10 @@ export default class WebRTC {
 
   getDataObserver () {
     return fromEvent(this.peer, 'data');
+  }
+
+  getStreamObserver () {
+    return fromEvent(this.peer, 'stream');
   }
 }
 

@@ -21,7 +21,11 @@
     >
       HangUp!
     </button>
-    <cam @load="onCamLoad" />
+    <cam-controller
+      @ready="onCamReady"
+      @track-change="onTrackChange"
+      @mute-change="onMuteChange"
+    />
     <video
       :srcObject.prop="remoteStream"
       autoplay
@@ -34,12 +38,12 @@
 <script>
 import WebRTC from '@/classes/WebRTC';
 import { getIceServers } from '@/utils/webrtc';
-import Cam from '@/components/atoms/Cam';
+import CamController from '@/components/molecules/CamController';
 import QrCode from '@/components/atoms/QrCode';
 
 export default {
   components: {
-    Cam,
+    CamController,
     QrCode
   },
 
@@ -87,14 +91,33 @@ export default {
       return webrtc;
     },
 
-    async onCamLoad (stream) {
+    close () {
+      this.webrtc.destroy();
+    },
+
+    onCamReady (stream) {
+      console.log('-> vue: init connection');
       this.stream = stream;
       this.config = getIceServers();
       this.connect();
     },
 
-    close () {
-      this.webrtc.destroy();
+    onTrackChange (tracks) {
+      if (this.webrtc) {
+        console.log('-> vue: track change');
+        this.webrtc.changeTracks(tracks);
+      }
+    },
+
+    onMuteChange (stream) {
+      if (this.webrtc) {
+        console.log('-> vue: mute change');
+        if (stream) {
+          this.webrtc.addAudioTrack(stream);
+        } else {
+          this.webrtc.removeAudioTrack(stream);
+        }
+      }
     },
 
     onPlaying () {
@@ -129,5 +152,10 @@ async function connectSlave (webrtc, key = null) {
       background-color: green;
     }
   }
+}
+
+video {
+  width: 160px;
+  height: auto;
 }
 </style>

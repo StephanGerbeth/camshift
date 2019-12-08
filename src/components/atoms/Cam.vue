@@ -1,113 +1,36 @@
 <template>
-  <div>
-    <video
-      autoplay
-      playsinline
-      :width="width"
-      :height="height"
-      :srcObject.prop="stream"
-      @loadedmetadata="onLoad"
-    />
-    <button @click="onClick">
-      Toggle
-    </button>
-  </div>
+  <video
+    autoplay
+    playsinline
+    muted
+    :srcObject.prop="stream"
+    @loadedmetadata="onLoad"
+  />
 </template>
 
 <script>
 export default {
   props: {
-    frameRate: {
-      type: Number,
+    stream: {
+      type: global.MediaStream,
       default () {
-        return 60;
-      }
-    },
-    facingMode: {
-      type: String,
-      default () {
-        return 'environment';
-      }
-    },
-    audio: {
-      type: Boolean,
-      default () {
-        return false;
+        return null;
       }
     }
-  },
-
-  data () {
-    return {
-      videoDevices: [],
-      stream: null,
-      width: 0,
-      height: 0
-    };
-  },
-
-  computed: {
-    constraints () {
-      return {
-        video: {
-          facingMode: this.facingMode,
-        },
-        audio: false
-      };
-    }
-  },
-
-  async mounted () {
-    this.videoDevices = await getDevices();
-    this.stream = await this.getStream();
   },
 
   methods: {
-    onLoad (e) {
-      this.width = e.target.videoWidth;
-      this.height = e.target.videoHeight;
+    onLoad () {
       console.log('-> cam: loaded');
       this.$emit('load', this.stream);
-    },
-
-    onClick () {
-      console.log('HIHI');
-      this.toggleVideoDevice();
-    },
-
-    getStream () {
-      return getUserMedia(getConstraints(this.videoDevices[0]));
-    },
-
-    async toggleVideoDevice () {
-      this.videoDevices.push(this.videoDevices.shift());
-      // this.stream = await this.getStream();
-      this.stream.getVideoTracks()[0].applyConstraints({
-        width: 160,
-        height: 120,
-      });
     }
   }
 };
-
-async function getDevices () {
-  const devices = await global.navigator.mediaDevices.enumerateDevices();
-  return devices.filter((device) => device.kind === 'videoinput');
-}
-
-function getConstraints (videoDevice) {
-  return {
-    video: {
-      deviceId: videoDevice.deviceId
-    },
-    audio: false
-  };
-}
-
-async function getUserMedia (constraints) {
-  return await global.navigator.mediaDevices.getUserMedia(constraints);
-}
 </script>
 
 <style lang="postcss" scoped>
+video {
+  width: 160px;
+  height: auto !important;
+}
 </style>
